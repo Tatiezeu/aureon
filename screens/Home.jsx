@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as Print from "expo-print"; // ✅ Added from second code
+import { useNavigation } from "@react-navigation/native"; // for navigation
+
 
 const months = [
   "January","February","March","April","May","June",
@@ -32,6 +34,7 @@ const generateDays = (monthIndex, year) => {
 };
 
 const Home = () => {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState("month");
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
@@ -205,15 +208,15 @@ const Home = () => {
             <Ionicons name="home-outline" size={22} color="#E6C367" />
             <Text style={styles.navText}>Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
+          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("Analytics")}>
             <Ionicons name="stats-chart-outline" size={22} color="#E6C367" />
             <Text style={styles.navText}>Analytics</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
+          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("History")}>
             <Ionicons name="document-text-outline" size={22} color="#E6C367" />
             <Text style={styles.navText}>History</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
+          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("Settings")}>
             <Ionicons name="settings-outline" size={22} color="#E6C367" />
             <Text style={styles.navText}>Settings</Text>
           </TouchableOpacity>
@@ -385,7 +388,7 @@ const styles = StyleSheet.create({
   buttonText: { color: "#001F60", fontWeight: "bold" },
   bottomNav: {
     flexDirection: "row", justifyContent: "space-evenly", alignItems: "center", backgroundColor: "#142A75",
-    paddingVertical: 12, position: "absolute", bottom: 0, width: "100%", borderTopWidth: 0.6, borderTopColor: "#E6C367",
+    paddingVertical: 12, position: "absolute", bottom: 0, maxwidth: "100%", borderTopWidth: 0.6, borderTopColor: "#E6C367",
   },
   navItem: { alignItems: "center", justifyContent: "center", width: "25%" },
   navText: { color: "#E6C367", fontSize: 12, marginTop: 2, fontWeight: "600" },

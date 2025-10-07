@@ -5,20 +5,22 @@ import SplashScreen from "../screens/SplashScreen";
 import Login from "../screens/Login";
 import Home from "../screens/Home";
 import OTPScreen from "../screens/OTPScreen";
-// import Analytics from "../screens/Analytics";
+import Analytics from "../screens/Analytics";
 import Settings from "../screens/Settings";
+import History from "../screens/History";
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   return (
-    <Stack.Navigator initialRouteName="Settings" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="Home" component={Home} />
       <Stack.Screen name="OTPScreen" component={OTPScreen} />
-      {/* <Stack.Screen name="Analytics" component={Analytics} /> */}
+      <Stack.Screen name="Analytics" component={Analytics} />
       <Stack.Screen name="Settings" component={Settings} />
+      <Stack.Screen name="History" component={History} />
     </Stack.Navigator>
   );
 }

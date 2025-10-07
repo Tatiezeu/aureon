@@ -9,8 +9,10 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons"; // for icons
+import { useNavigation } from "@react-navigation/native"; // for navigation
 
 const Login = () => {
+  const navigation = useNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -60,7 +62,7 @@ const Login = () => {
         </TouchableOpacity>
 
         {/* Login Button */}
-        <TouchableOpacity style={styles.loginButton}>
+        <TouchableOpacity style={styles.loginButton}  onPress={() => navigation.navigate("OTPScreen")}>
           <Text style={styles.loginText}>Login</Text>
         </TouchableOpacity>
       </View>
