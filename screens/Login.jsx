@@ -15,7 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
-const BASE_URL = "http://192.168.0.103:8000/api";
+const BASE_URL = "http://172.20.10.2:8000/api";
 
 const Login = () => {
   const navigation = useNavigation();
@@ -59,7 +59,10 @@ const Login = () => {
       Alert.alert("Verification", "A verification code has been sent to your email.");
 
       // Step 4: Navigate to OTP screen with email passed as param
-      navigation.navigate("OTPScreen", { email });
+      navigation.navigate("OTPScreen", {
+  phoneNumber: "+237676612597",
+  email: email, // Pass the email along
+});
 
     } catch (error) {
       console.error("Login error:", error.response?.data || error.message);
