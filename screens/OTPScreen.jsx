@@ -1,44 +1,112 @@
 // screens/OTPScreen.jsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import axios from "axios";
+
+const BASE_URL = "http://192.168.0.103:8000";
 
 const OTPScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { email } = route.params || {}; // email passed from Login screen
+
   const [code, setCode] = useState(["", "", "", ""]);
+  const [loading, setLoading] = useState(false);
+  const [timer, setTimer] = useState(60);
   const inputs = useRef([]);
 
+  // ⏳ Countdown for resend
+  useEffect(() => {
+    if (timer > 0) {
+      const interval = setTimeout(() => setTimer(timer - 1), 1000);
+      return () => clearTimeout(interval);
+    }
+  }, [timer]);
+
+  // Handle OTP digit changes
   const handleChange = (text, index) => {
-    if (/^\d?$/.test(text)) { // only allow single digit
+    if (/^\d?$/.test(text)) {
       const newCode = [...code];
       newCode[index] = text;
       setCode(newCode);
-      if (text && index < 3) {
-        inputs.current[index + 1].focus();
-      }
+      if (text && index < 3) inputs.current[index + 1].focus();
     }
   };
 
-  const handleVerify = () => {
-    // alert(Code entered: ${code.join("")});
-     navigation.replace("Home");
+  // ✅ Verify OTP with backend
+  const handleVerify = async () => {
+    const enteredCode = code.join("");
+    if (enteredCode.length !== 4) {
+      Alert.alert("Error", "Please enter the 4-digit verification code.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/email-verification/verify-login-code/`,
+        { email, code: enteredCode },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      const data = response.data;
+
+      if (response.status === 200 && data.verified) {
+        Alert.alert("Success", "Email verified successfully!");
+        navigation.replace("Home");
+      } else {
+        Alert.alert("Invalid Code", data.message || "The code is incorrect or expired.");
+      }
+    } catch (error) {
+      console.error("OTP verification error:", error.response?.data || error.message);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Verification failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleResend = () => {
-    alert("Code resent!");
-    navigation.replace("Users");
+  // ✅ Resend verification code
+  const handleResend = async () => {
+    if (timer > 0) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        `${BASE_URL}/email-verification/send-login-code/`,
+        { email },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (response.status === 200) {
+        Alert.alert("Code Resent", "A new verification code was sent to your email.");
+        setTimer(60);
+      } else {
+        Alert.alert("Error", "Failed to resend verification code.");
+      }
+    } catch (error) {
+      console.error("Resend code error:", error.response?.data || error.message);
+      Alert.alert("Error", "Could not resend code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChangeEmail = () => {
-    alert("Change email pressed");
+    navigation.replace("Login");
   };
 
   const handleUsePhone = () => {
@@ -46,10 +114,7 @@ const OTPScreen = () => {
   };
 
   return (
-    <LinearGradient
-      colors={["#001a4d", "#002366"]}
-      style={styles.container}
-    >
+    <LinearGradient colors={["#001a4d", "#002366"]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Ionicons name="home-outline" size={42} color="#FFD700" />
@@ -59,9 +124,7 @@ const OTPScreen = () => {
       {/* Card */}
       <View style={styles.card}>
         <Text style={styles.subtitle}>Verify Your Email</Text>
-        <Text style={styles.infoText}>
-          We have sent a 4-digit code to your email
-        </Text>
+        <Text style={styles.infoText}>A 4-digit code was sent to {email}</Text>
 
         {/* OTP Inputs */}
         <View style={styles.otpWrapper}>
@@ -80,30 +143,43 @@ const OTPScreen = () => {
 
         {/* Resend */}
         <View style={styles.resendWrapper}>
-          <Text style={styles.resendText}>Didnot receive the code?</Text>
-          <TouchableOpacity onPress={handleResend}>
-            <Text style={styles.resendLink}>Resend</Text>
+          <Text style={styles.resendText}>Didn’t receive the code?</Text>
+          <TouchableOpacity onPress={handleResend} disabled={timer > 0}>
+            <Text style={styles.resendLink}>
+              {timer > 0 ? `Resend in ${timer}s` : "Resend"}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        
-
         {/* Verify Button */}
-        <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-          <Text style={styles.verifyText}>Verify</Text>
+        <TouchableOpacity
+          style={styles.verifyButton}
+          onPress={handleVerify}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#002366" />
+          ) : (
+            <Text style={styles.verifyText}>Verify</Text>
+          )}
         </TouchableOpacity>
 
-        {/* Use Telephone */}
-        <TouchableOpacity style={styles.changeEmailWrapper} onPress={handleUsePhone}>
-          <Text style={styles.changeEmailText}>Verify with your phone number?</Text>
+        {/* Other options */}
+        <TouchableOpacity
+          style={styles.changeEmailWrapper}
+          onPress={handleUsePhone}
+        >
+          <Text style={styles.changeEmailText}>
+            Verify with your phone number?
+          </Text>
         </TouchableOpacity>
 
-        {/* Change Email */}
-        <TouchableOpacity style={styles.changeEmailWrapper} onPress={handleChangeEmail}>
+        <TouchableOpacity
+          style={styles.changeEmailWrapper}
+          onPress={handleChangeEmail}
+        >
           <Text style={styles.changeEmailText}>Change email?</Text>
         </TouchableOpacity>
-
-        
       </View>
     </LinearGradient>
   );
@@ -196,7 +272,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
-  changeEmailWrapper: {},
+  changeEmailWrapper: {
+    marginTop: 5,
+  },
   changeEmailText: {
     color: "#FFD700",
     fontSize: 14,
