@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#001F60",
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 40,
   },
   header: {
     flexDirection: "row",
@@ -158,5 +158,6 @@ const styles = StyleSheet.create({
   chart: {
     borderRadius: 8,
     marginBottom: 20,
+    
   },
 });

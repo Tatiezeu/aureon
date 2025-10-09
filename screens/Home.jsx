@@ -192,6 +192,7 @@ const Home = () => {
   const [showMonthModal, setShowMonthModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(3);
 
   const [room, setRoom] = useState("");
   const [bar, setBar] = useState("");
@@ -245,15 +246,25 @@ const Home = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerText}>Accountant Aureon</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => {
-              setUpdateMode(false);
-              setShowAddModal(true);
-            }}
-          >
-            <Ionicons name="add" size={26} color="#001F60" />
-          </TouchableOpacity>
+           {/* Notification Icon */}
+            <TouchableOpacity style={styles.notificationButton} onPress={() => { setUnreadCount(0); navigation.navigate("Notifications"); }}>
+              <Ionicons name="notifications-outline" size={24} color="#E6C367" />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+           {/*Add Icon */}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setUpdateMode(false);
+                setShowAddModal(true);
+              }}
+            >
+              <Ionicons name="add" size={26} color="#001F60" />
+            </TouchableOpacity>
         </View>
 
         {/* Summary Cards */}
@@ -408,7 +419,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#001F60", paddingHorizontal: 20, paddingBottom: 90 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 5 },
   headerText: { fontSize: 22, color: "#E6C367", fontWeight: "bold" },
-  addButton: { backgroundColor: "#E6C367", borderRadius: 20, padding: 5, width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+  addButton: { backgroundColor: "#E6C367", borderRadius: 20, width: 34, height: 34, alignItems: "center", justifyContent: "center" },
   cardLarge: { backgroundColor: "#E6C367", borderRadius: 12, marginTop: 10 },
   cardSmall: { flex: 1, backgroundColor: "#E6C367", borderRadius: 12, marginHorizontal: 4 },
   cardLabel: { fontSize: 14, color: "#3A2E00" },
@@ -444,4 +455,22 @@ const styles = StyleSheet.create({
   submitText: { color: "#FFF", fontWeight: "bold" },
   closeBtn: { marginTop: 10, alignItems: "center" },
   closeText: { color: "#999" },
+  notificationButton: { position: "relative", width: 34, height: 40, marginRight: -40, marginTop: 5, alignItems: "center", justifyContent: "center" },
+  notificationBadge: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    backgroundColor: "red",
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 3,
+  },
+  notificationBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
 });

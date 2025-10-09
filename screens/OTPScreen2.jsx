@@ -11,7 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
-const OTPScreen = () => {
+const OTPScreen2 = () => {
   const navigation = useNavigation();
   const [code, setCode] = useState(["", "", "", ""]);
   const inputs = useRef([]);
@@ -37,12 +37,12 @@ const OTPScreen = () => {
     navigation.replace("Users");
   };
 
-  const handleChangeEmail = () => {
-    alert("Change email pressed");
+  const handleChangePhone = () => {
+    alert("Change phone pressed");
   };
 
-  const handleUsePhone = () => {
-    navigation.replace("OTPScreen2");
+  const handleUseEmail = () => {
+    navigation.replace("OTPScreen");
   };
 
   return (
@@ -58,9 +58,9 @@ const OTPScreen = () => {
 
       {/* Card */}
       <View style={styles.card}>
-        <Text style={styles.subtitle}>Verify Your Email</Text>
+        <Text style={styles.subtitle}>Verify Your Phone</Text>
         <Text style={styles.infoText}>
-          We have sent a 4-digit code to your email
+          We have sent a 4-digit code to your phone
         </Text>
 
         {/* OTP Inputs */}
@@ -93,14 +93,14 @@ const OTPScreen = () => {
           <Text style={styles.verifyText}>Verify</Text>
         </TouchableOpacity>
 
-        {/* Use Telephone */}
-        <TouchableOpacity style={styles.changeEmailWrapper} onPress={handleUsePhone}>
-          <Text style={styles.changeEmailText}>Verify with your phone number?</Text>
+        {/* Use Email */}
+        <TouchableOpacity style={styles.changeEmailWrapper} onPress={handleUseEmail}>
+          <Text style={styles.changeEmailText}>Verify with your email?</Text>
         </TouchableOpacity>
 
-        {/* Change Email */}
-        <TouchableOpacity style={styles.changeEmailWrapper} onPress={handleChangeEmail}>
-          <Text style={styles.changeEmailText}>Change email?</Text>
+        {/* Change Phone */}
+        <TouchableOpacity style={styles.changeEmailWrapper} onPress={handleChangePhone}>
+          <Text style={styles.changeEmailText}>Change phone?</Text>
         </TouchableOpacity>
 
         
@@ -109,7 +109,7 @@ const OTPScreen = () => {
   );
 };
 
-export default OTPScreen;
+export default OTPScreen2;
 
 const styles = StyleSheet.create({
   container: {
