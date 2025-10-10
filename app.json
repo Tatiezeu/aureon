@@ -1,11 +1,12 @@
 {
   "expo": {
+    "platforms": ["ios", "android", "web"],
     "name": "AUREON",
     "slug": "aureon",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/aureon.png",
-    "scheme": "AUREON",
+    "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -46,3 +47,4 @@
     }
   }
 }
+

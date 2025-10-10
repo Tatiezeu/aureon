@@ -11,6 +11,7 @@ import History from "../screens/History";
 import Notifications from "../screens/Notifications";
 import Users from "../screens/Users";
 import OTPScreen2 from "../screens/OTPScreen2";
+import ResetPassword from "../screens/ResetPassword";
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -26,6 +27,7 @@ export default function AppNavigator() {
       <Stack.Screen name="History" component={History} />
       <Stack.Screen name="Notifications" component={Notifications} />
       <Stack.Screen name="Users" component={Users} />
+      <Stack.Screen name="ResetPassword" component={ResetPassword} />
     </Stack.Navigator>
   );
 }
