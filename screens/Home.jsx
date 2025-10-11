@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,45 +7,36 @@ import {
   ScrollView,
   Modal,
   SafeAreaView,
-  FlatList,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  TextInput,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as Print from "expo-print";
 import { useNavigation } from "@react-navigation/native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+
+// Backend API URL
+const API_URL = "http://172.20.10.2:8000/api/"; // replace with your backend
 
 const months = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
 ];
 
-const generateDays = (monthIndex, year) => {
-  const totalDays = new Date(year, monthIndex + 1, 0).getDate();
-  const days = [];
-  for (let i = 1; i <= totalDays; i++) {
-    days.push({
-      id: i.toString(),
-      date: `${i < 10 ? "0" + i : i}-${months[monthIndex]}-${year}`,
-      amount: (Math.random() * 100000).toFixed(2),
-    });
-  }
-  return days;
-};
-
 // ==========================
 // GenerateReportForm Component
 // ==========================
-function GenerateReportForm({ onClose, onSubmit }) {
-  const [hotel, setHotel] = useState("");
-  const [date, setDate] = useState(new Date());
+function GenerateReportForm({ onClose, onSubmit, reportData }) {
+  const [hotel, setHotel] = useState(reportData?.hotel || "Mbolo Hotel");
+  const [date, setDate] = useState(reportData?.date ? new Date(reportData.date) : new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [hebergement, setHebergement] = useState("");
-  const [bar, setBar] = useState("");
-  const [cuisine, setCuisine] = useState("");
-  const [expenses, setExpenses] = useState([{ label: "", amount: "" }]);
+  const [hebergement, setHebergement] = useState(reportData?.hebergement || "");
+  const [bar, setBar] = useState(reportData?.bar || "");
+  const [cuisine, setCuisine] = useState(reportData?.cuisine || "");
+  const [expenses, setExpenses] = useState(reportData?.expenses || [{ label: "", amount: "" }]);
 
   const totalIncome =
     (parseFloat(hebergement) || 0) +
@@ -66,6 +57,22 @@ function GenerateReportForm({ onClose, onSubmit }) {
     setExpenses(newExpenses);
   };
 
+  const handleSubmit = () => {
+    if (!hotel) {
+      Alert.alert("Error", "Please select a hotel");
+      return;
+    }
+    onSubmit({
+      date,
+      hotel,
+      hebergement,
+      bar,
+      cuisine,
+      expenses,
+      reste,
+    });
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -78,15 +85,24 @@ function GenerateReportForm({ onClose, onSubmit }) {
       >
         <Text style={styles.formTitle}>Generate Report</Text>
 
+        {/* Hotel Picker */}
+        <View style={[styles.input, { padding: 0 }]}>
+          <Picker
+            selectedValue={hotel}
+            onValueChange={(itemValue) => setHotel(itemValue)}
+            style={{ color: "#001F60" }}
+          >
+            <Picker.Item label="Mbolo Hotel" value="Mbolo Hotel" />
+            <Picker.Item label="Hotel La Dibamba" value="Hotel La Dibamba" />
+          </Picker>
+        </View>
+
+        {/* Date Picker */}
         <TouchableOpacity
-          style={styles.input}
+          style={[styles.input, { justifyContent: "center" }]}
           onPress={() => setShowPicker(true)}
         >
-          <Text>
-            {date
-              ? `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`
-              : "Select Date"}
-          </Text>
+          <Text>{`${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`}</Text>
         </TouchableOpacity>
 
         {showPicker && (
@@ -101,48 +117,33 @@ function GenerateReportForm({ onClose, onSubmit }) {
           />
         )}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Hotel Name"
-          value={hotel}
-          onChangeText={setHotel}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Montant Hébergement"
+        {/* Amount Inputs */}
+        <TextInputWithLabel
+          label="Montant Hébergement"
           value={hebergement}
           onChangeText={setHebergement}
-          keyboardType="numeric"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Montant Bar"
-          value={bar}
-          onChangeText={setBar}
-          keyboardType="numeric"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Montant Cuisine"
+        <TextInputWithLabel label="Montant Bar" value={bar} onChangeText={setBar} />
+        <TextInputWithLabel
+          label="Montant Cuisine"
           value={cuisine}
           onChangeText={setCuisine}
-          keyboardType="numeric"
         />
 
         <Text style={styles.subtitle}>Expenses</Text>
         {expenses.map((exp, i) => (
           <View key={i} style={styles.expenseRow}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginRight: 6 }]}
-              placeholder="Label"
+            <TextInputWithLabel
+              label="Label"
               value={exp.label}
               onChangeText={(v) => updateExpense(i, "label", v)}
+              containerStyle={{ flex: 1, marginRight: 6 }}
             />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Amount"
+            <TextInputWithLabel
+              label="Amount"
               value={exp.amount}
               onChangeText={(v) => updateExpense(i, "amount", v)}
+              containerStyle={{ flex: 1 }}
               keyboardType="numeric"
             />
           </View>
@@ -158,19 +159,11 @@ function GenerateReportForm({ onClose, onSubmit }) {
 
         <TouchableOpacity
           style={styles.submitBtn}
-          onPress={() =>
-            onSubmit({
-              date,
-              hotel,
-              hebergement,
-              bar,
-              cuisine,
-              expenses,
-              reste,
-            })
-          }
+          onPress={handleSubmit}
         >
-          <Text style={styles.submitText}>Generate Report</Text>
+          <Text style={styles.submitText}>
+            {reportData ? "Update Report" : "Generate Report"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
@@ -182,62 +175,138 @@ function GenerateReportForm({ onClose, onSubmit }) {
 }
 
 // ==========================
+// Custom TextInput with Label
+// ==========================
+function TextInputWithLabel({ label, value, onChangeText, containerStyle, keyboardType }) {
+  return (
+    <View style={containerStyle}>
+      <Text style={{ fontWeight: "600", marginBottom: 4, color: "#001F60" }}>{label}</Text>
+      <View style={[styles.input, { marginBottom: 10 }]}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType={keyboardType || "default"}
+          style={{ padding: 10 }}
+        />
+      </View>
+    </View>
+  );
+}
+
+// ==========================
 // Home Component
 // ==========================
 const Home = () => {
   const navigation = useNavigation();
-  const [activeTab, setActiveTab] = useState("month");
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [showMonthModal, setShowMonthModal] = useState(false);
+  const [activeTab, setActiveTab] = useState("mbolo");
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
 
+  const [reportData, setReportData] = useState(null);
   const [room, setRoom] = useState("");
   const [bar, setBar] = useState("");
   const [restaurant, setRestaurant] = useState("");
   const [expenses, setExpenses] = useState([{ label: "", amount: "" }]);
   const [updateMode, setUpdateMode] = useState(false);
-  const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const days = generateDays(selectedMonthIndex, year);
+  // Calculate amounts for summary cards
+  const totalAmount =
+    (parseFloat(room) || 0) +
+    (parseFloat(bar) || 0) +
+    (parseFloat(restaurant) || 0);
+
   const totalExpenses = expenses.reduce(
-    (acc, exp) => acc + (parseFloat(exp.amount) || 0),
+    (sum, e) => sum + (parseFloat(e.amount) || 0),
     0
   );
-  const totalAmount =
-    (parseFloat(room) || 0) + (parseFloat(bar) || 0) + (parseFloat(restaurant) || 0);
+
   const netAmount = totalAmount - totalExpenses;
 
-  const prefillData = {
-    room: "25000",
-    bar: "12000",
-    restaurant: "8000",
+  const fetchReport = async () => {
+  try {
+    // 1️⃣ Try fetching report for selected date
+    let response = await fetch(`${API_URL}/reports/?date=${date.toISOString().slice(0,10)}`);
+    let data = await response.json();
+
+    if (data.length > 0) {
+      setReportData(data[0]);
+    } else {
+      // 2️⃣ If no report for selected date, fetch latest report
+      response = await fetch(`${API_URL}/reports/`);
+      data = await response.json();
+      if (data.length > 0) {
+        setReportData(data[0]);
+        Alert.alert("Info", "No report for selected date. Showing latest report instead.");
+      } else {
+        // 3️⃣ No report exists at all
+        setReportData(null);
+      }
+    }
+
+    // Update state fields for display
+    if (data.length > 0) {
+      const report = data[0];
+      setRoom(report.hebergement);
+      setBar(report.bar);
+      setRestaurant(report.cuisine);
+      setExpenses(report.expenses.length ? report.expenses : [{ label: "", amount: "" }]);
+    } else {
+      setRoom("");
+      setBar("");
+      setRestaurant("");
+      setExpenses([{ label: "", amount: "" }]);
+    }
+  } catch (error) {
+    console.log(error);
+    Alert.alert("Error", "Failed to fetch report data");
+  }
+};
+
+
+  const handleGenerateOrUpdate = async (data) => {
+    try {
+      const method = reportData ? "PUT" : "POST";
+      const url = reportData ? `${API_URL}/reports/${reportData.id}/` : `${API_URL}/reports/`;
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotel: data.hotel,
+          date: data.date.toISOString().slice(0,10),
+          hebergement: data.hebergement,
+          bar: data.bar,
+          cuisine: data.cuisine,
+          expenses: data.expenses,
+          reste: data.reste,
+        }),
+      });
+
+      if (response.ok) {
+        Alert.alert("Success", reportData ? "Report updated" : "Report generated");
+        setShowAddModal(false);
+        fetchReport();
+      } else {
+        Alert.alert("Error", "Failed to save report");
+      }
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Failed to save report");
+    }
   };
 
   const handlePrint = async () => {
-    const html = `
-      <html>
-        <body style="font-family: Arial; padding: 20px;">
-          <h2 style="color:#001F60;">Report for ${months[selectedMonthIndex]} ${year}</h2>
-          <p><strong>Date:</strong> ${date.toDateString()}</p>
-          <p><strong>Room:</strong> FCFA ${room}</p>
-          <p><strong>Bar:</strong> FCFA ${bar}</p>
-          <p><strong>Restaurant:</strong> FCFA ${restaurant}</p>
-          <h3>Expenses:</h3>
-          ${expenses
-            .map(
-              (e) => `<p>${e.label || "Expense"}: -FCFA ${e.amount || 0}</p>`
-            )
-            .join("")}
-          <p><strong>Total Expenses:</strong> FCFA ${totalExpenses.toFixed(2)}</p>
-          <p><strong>Net Amount:</strong> FCFA ${netAmount.toFixed(2)}</p>
-        </body>
-      </html>
-    `;
-    await Print.printAsync({ html });
+    try {
+      const response = await fetch(`${API_URL}/reports/${reportData?.id}/print/`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      await Print.printAsync({ uri: url });
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Failed to print report");
+    }
   };
 
   return (
@@ -246,65 +315,62 @@ const Home = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerText}>Accountant Aureon</Text>
-           {/* Notification Icon */}
-            <TouchableOpacity style={styles.notificationButton} onPress={() => { setUnreadCount(0); navigation.navigate("Notifications"); }}>
-              <Ionicons name="notifications-outline" size={24} color="#E6C367" />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-           {/*Add Icon */}
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => {
-                setUpdateMode(false);
-                setShowAddModal(true);
-              }}
-            >
-              <Ionicons name="add" size={26} color="#001F60" />
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => {
+              setUnreadCount(0);
+              navigation.navigate("Notifications");
+            }}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#E6C367" />
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              setUpdateMode(false);
+              setShowAddModal(true);
+            }}
+          >
+            <Ionicons name="add" size={26} color="#001F60" />
+          </TouchableOpacity>
         </View>
 
         {/* Summary Cards */}
-        <View style={[styles.cardLarge, { padding: 14 }]}>
+        <View style={[styles.cardLarge, { padding: 20 }]}>
           <Text style={styles.cardLabel}>Net Amount</Text>
-          <Text style={styles.cardValue}>FCFA {netAmount.toFixed(2)}</Text>
+          <Text style={[styles.cardValue, { fontSize: 22 }]}>{netAmount.toFixed(2)} FCFA</Text>
         </View>
 
         <View style={styles.row}>
-          <View style={[styles.cardSmall, { padding: 10 }]}>
+          <View style={[styles.cardSmall, { padding: 14 }]}>
             <Text style={styles.cardLabel}>Total Amount</Text>
-            <Text style={styles.cardValue}>FCFA {totalAmount.toFixed(2)}</Text>
+            <Text style={styles.cardValue}>{totalAmount.toFixed(2)} FCFA</Text>
           </View>
-          <View style={[styles.cardSmall, { padding: 10 }]}>
+          <View style={[styles.cardSmall, { padding: 14 }]}>
             <Text style={styles.cardLabel}>Total Expenses</Text>
-            <Text style={styles.cardValue}>FCFA {totalExpenses.toFixed(2)}</Text>
+            <Text style={styles.cardValue}>{totalExpenses.toFixed(2)} FCFA</Text>
           </View>
         </View>
 
         {/* Tabs */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[styles.tabButton, activeTab === "month" && styles.activeTabButton]}
-            onPress={() => setActiveTab("month")}
+            style={[styles.tabButton, activeTab === "mbolo" && styles.activeTabButton]}
+            onPress={() => setActiveTab("mbolo")}
           >
-            <Text style={[styles.tabText, activeTab === "month" && styles.activeTabText]}>
-              Month
-            </Text>
+            <Text style={[styles.tabText, activeTab === "mbolo" && styles.activeTabText]}>Mbolo</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabButton, activeTab === "custom" && styles.activeTabButton]}
-            onPress={() => {
-              setActiveTab("custom");
-              setShowMonthModal(true);
-            }}
+            style={[styles.tabButton, activeTab === "dibamba" && styles.activeTabButton]}
+            onPress={() => setActiveTab("dibamba")}
           >
-            <Text style={[styles.tabText, activeTab === "custom" && styles.activeTabText]}>
-              Custom
-            </Text>
+            <Text style={[styles.tabText, activeTab === "dibamba" && styles.activeTabText]}>Dibamba</Text>
           </TouchableOpacity>
         </View>
 
@@ -314,9 +380,7 @@ const Home = () => {
           onPress={() => setShowDatePicker(true)}
         >
           <Text style={{ color: "#E6C367" }}>
-            {date
-              ? `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`
-              : "Select Date"}
+            {`${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`}
           </Text>
         </TouchableOpacity>
 
@@ -332,36 +396,39 @@ const Home = () => {
           />
         )}
 
-        {/* Scrollable Days */}
+        {/* Single Card with Inputs */}
         <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-          {days.map((item) => (
-            <View key={item.id} style={[styles.dayCard, { padding: 10 }]}>
-              <Text style={styles.dateText}>{item.date}</Text>
-              <Text style={styles.amountText}>Net Amount: FCFA {netAmount.toFixed(2)}</Text>
-              <Text style={styles.amountText}>Total Amount: FCFA {totalAmount.toFixed(2)}</Text>
-              <Text style={styles.amountText}>Total Expenses: FCFA {totalExpenses.toFixed(2)}</Text>
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.updateButton}
-                  onPress={() => {
-                    setUpdateMode(true);
-                    setRoom(prefillData.room);
-                    setBar(prefillData.bar);
-                    setRestaurant(prefillData.restaurant);
-                    setShowAddModal(true);
-                  }}
-                >
-                  <Text style={styles.buttonText}>Update</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.printButton}
-                  onPress={handlePrint}
-                >
-                  <Text style={styles.buttonText}>Print</Text>
-                </TouchableOpacity>
+          <View style={[styles.dayCard, { padding: 20 }]}>
+            <Text style={styles.dateText}>Report for {date.toDateString()}</Text>
+
+            <Text style={styles.amountText}>Montant Hébergement: FCFA {room}</Text>
+            <Text style={styles.amountText}>Montant Bar: FCFA {bar}</Text>
+            <Text style={styles.amountText}>Montant Cuisine: FCFA {restaurant}</Text>
+
+            <Text style={styles.subtitle}>Expenses</Text>
+            {expenses.map((exp, i) => (
+              <View key={i} style={styles.expenseRow}>
+                <Text style={{ color: "#FFF", flex: 1 }}>{exp.label || "Label"}</Text>
+                <Text style={{ color: "#FFF", flex: 1 }}>FCFA {exp.amount || 0}</Text>
               </View>
+            ))}
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.updateButton}
+                onPress={() => {
+                  setUpdateMode(true);
+                  setShowAddModal(true);
+                }}
+              >
+                <Text style={styles.buttonText}>Update</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.printButton} onPress={handlePrint}>
+                <Text style={styles.buttonText}>Print</Text>
+              </TouchableOpacity>
             </View>
-          ))}
+          </View>
         </ScrollView>
 
         {/* Bottom Navigation */}
@@ -399,10 +466,8 @@ const Home = () => {
             <View style={styles.addModalContainer}>
               <GenerateReportForm
                 onClose={() => setShowAddModal(false)}
-                onSubmit={(data) => {
-                  console.log("Report Data:", data);
-                  setShowAddModal(false);
-                }}
+                onSubmit={handleGenerateOrUpdate}
+                reportData={updateMode ? reportData : null}
               />
             </View>
           </View>
@@ -414,63 +479,51 @@ const Home = () => {
 
 export default Home;
 
+// ==========================
+// Styles
+// ==========================
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#001F60" },
   container: { flex: 1, backgroundColor: "#001F60", paddingHorizontal: 20, paddingBottom: 90 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 5 },
   headerText: { fontSize: 22, color: "#E6C367", fontWeight: "bold" },
   addButton: { backgroundColor: "#E6C367", borderRadius: 20, width: 34, height: 34, alignItems: "center", justifyContent: "center" },
-  cardLarge: { backgroundColor: "#E6C367", borderRadius: 12, marginTop: 10 },
-  cardSmall: { flex: 1, backgroundColor: "#E6C367", borderRadius: 12, marginHorizontal: 4 },
-  cardLabel: { fontSize: 14, color: "#3A2E00" },
-  cardValue: { fontSize: 18, color: "#3A2E00", fontWeight: "bold" },
-  row: { flexDirection: "row", marginTop: 10 },
+  cardLarge: { backgroundColor: "#E6C367", borderRadius: 14, marginTop: 10 },
+  cardSmall: { flex: 1, backgroundColor: "#E6C367", borderRadius: 14, marginHorizontal: 4 },
+  cardLabel: { fontSize: 16, color: "#3A2E00", fontWeight: "600" },
+  cardValue: { fontSize: 20, color: "#3A2E00", fontWeight: "bold" },
+  row: { flexDirection: "row", marginTop: 12 },
   tabContainer: { flexDirection: "row", justifyContent: "center", backgroundColor: "#142A75", borderRadius: 25, marginTop: 16 },
-  tabButton: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 25 },
+  tabButton: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 25 },
   activeTabButton: { backgroundColor: "#E6C367" },
   tabText: { color: "#E6C367", fontWeight: "600" },
   activeTabText: { color: "#001F60", fontWeight: "bold" },
   scrollArea: { flex: 1 },
-  dayCard: { backgroundColor: "#142A75", borderRadius: 10, marginBottom: 10 },
-  dateText: { color: "#E6C367", fontWeight: "bold", marginBottom: 4 },
-  amountText: { color: "#FFFFFF", marginBottom: 4 },
-  buttonRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 6 },
-  printButton: { backgroundColor: "#E6C367", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  updateButton: { backgroundColor: "#FFC107", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  dayCard: { backgroundColor: "#142A75", borderRadius: 12, marginBottom: 10 },
+  dateText: { color: "#E6C367", fontWeight: "bold", marginBottom: 6},
+  amountText: { color: "#FFFFFF", marginBottom: 6 },
+  buttonRow: { flexDirection: "row", justifyContent: "center", gap: 10,padding:10, marginTop: 8 },
+  printButton: { backgroundColor: "#E6C367", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  updateButton: { backgroundColor: "#FFC107", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   buttonText: { color: "#001F60", fontWeight: "bold" },
-  bottomNav: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", backgroundColor: "#142A75", paddingVertical: 10 },
+  bottomNav: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", backgroundColor: "#142A75", paddingVertical: 12 },
   navItem: { alignItems: "center" },
   navText: { color: "#E6C367", fontSize: 12, marginTop: 4 },
   modalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" },
-  addModalContainer: { width: "95%", height: "90%", backgroundColor: "#FFF", borderRadius: 12, overflow: "hidden" },
-  formContainer: { flex: 1, backgroundColor: "#FFF", padding: 20 },
-  formTitle: { fontSize: 20, fontWeight: "bold", color: "#001F60", marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: "#CCC", borderRadius: 8, padding: 10, marginBottom: 10, backgroundColor: "#FFF" },
-  subtitle: { fontSize: 16, fontWeight: "bold", color: "#001F60", marginBottom: 8, marginTop: 12 },
-  expenseRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  addBtn: { backgroundColor: "#E6C367", paddingVertical: 10, borderRadius: 8, alignItems: "center", marginBottom: 16 },
+  addModalContainer: { width: "100%", height: "100%", backgroundColor: "#FFF", borderRadius: 14, overflow: "hidden" },
+  formContainer: { flex: 1, backgroundColor: "#FFF", padding: 10 },
+  formTitle: { fontSize: 22, fontWeight: "bold", color: "#001F60", marginBottom: 16, marginTop: 40, textAlign: "center" },
+  input: { borderWidth: 1, borderColor: "#CCC", borderRadius: 10,marginTop:10,  marginBottom: 10, backgroundColor: "#FFF" },
+  subtitle: { fontSize: 18, fontWeight: "bold", color: "#001F60", marginBottom: 10, marginTop: 14 },
+  expenseRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  addBtn: { backgroundColor: "#E6C367", paddingVertical: 12, borderRadius: 10, alignItems: "center", marginBottom: 18 },
   addBtnText: { color: "#001F60", fontWeight: "bold" },
-  summary: { fontSize: 16, color: "#001F60", marginBottom: 6 },
-  submitBtn: { backgroundColor: "#001F60", padding: 12, borderRadius: 8, alignItems: "center", marginTop: 10 },
+  summary: { fontSize: 16, color: "#001F60", marginBottom: 8 },
+  submitBtn: { backgroundColor: "#001F60", padding: 14, borderRadius: 10, alignItems: "center", marginTop: 12 },
   submitText: { color: "#FFF", fontWeight: "bold" },
-  closeBtn: { marginTop: 10, alignItems: "center" },
+  closeBtn: { marginTop: 12, alignItems: "center" },
   closeText: { color: "#999" },
   notificationButton: { position: "relative", width: 34, height: 40, marginRight: -40, marginTop: 5, alignItems: "center", justifyContent: "center" },
-  notificationBadge: {
-    position: "absolute",
-    top: 3,
-    right: 3,
-    backgroundColor: "red",
-    borderRadius: 10,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 3,
-  },
-  notificationBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
+  notificationBadge: { position: "absolute", top: 3, right: 3, backgroundColor: "red", borderRadius: 10, minWidth: 16, height: 16, justifyContent: "center", alignItems: "center", paddingHorizontal: 3 },
+  notificationBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
 });
