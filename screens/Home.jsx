@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   TextInput,
+  Dimensions,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -19,19 +20,7 @@ import { useNavigation } from "@react-navigation/native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import axios from "axios";
 
-/*
-  Home.jsx - Updated to fix "fields required" when creating reports.
-  Changes:
-  - Robust client-side validation before sending create/update requests.
-  - Final payload includes both backend-friendly field names:
-      - montant_hebergement, montant_bar, montant_cuisine (numeric)
-      - hebergement, bar, cuisine (string formatted as "1234.00") — included in case backend expects these names
-  - Expenses amounts normalized to numeric & string forms depending on backend needs.
-  - Pre-check logic uses exact matching (hotel_name + YYYY-MM-DD).
-  - displayReport remains single source-of-truth for rendering.
-*/
-
-const API_URL = "http://192.168.0.122:8000/api/reports/";
+const API_URL = "http://172.20.10.2:8000/api/reports/";
 
 const months = [
   "January","February","March","April","May","June","July","August","September","October","November","December",
@@ -60,16 +49,22 @@ const EMPTY_EXPENSE = { label: "", amount: "" };
 
 function TextInputWithLabel({ label, value, onChangeText, keyboardType }) {
   return (
-    <View>
-      <Text style={{ fontWeight: "600", marginBottom: 4, color: "#001F60" }}>{label}</Text>
-      <View style={[styles.input, { marginBottom: 10 }]}>
-        <TextInput value={value} onChangeText={onChangeText} keyboardType={keyboardType || "default"} style={{ padding: 10 }} />
+    <View style={{ marginBottom: 8 }}>
+      <Text style={{ fontWeight: "600", marginBottom: 4, color: "#001F60", fontSize: 14 }}>{label}</Text>
+      <View style={[styles.input, { marginBottom: 0 }]}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType={keyboardType || "default"}
+          style={{ padding: 8, fontSize: 14, color: "#001F60" }}
+          placeholderTextColor="#666"
+          placeholder={`Enter ${label.toLowerCase()}`}
+        />
       </View>
     </View>
   );
 }
 
-/* Modal Form */
 function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selectedDate }) {
   const initialHotel = reportData?.hotel_name ?? defaultHotel ?? "Mbolo Hotel";
   const initialDate = reportData?.created_at ? new Date(reportData.created_at) : selectedDate ?? new Date();
@@ -108,7 +103,6 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
       setCuisine("");
       setExpenses([Object.assign({}, EMPTY_EXPENSE)]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportData, defaultHotel, selectedDate]);
 
   const totalIncome = toNumber(hebergement) + toNumber(bar) + toNumber(cuisine);
@@ -129,11 +123,8 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
   };
 
   const validateBeforeSubmit = () => {
-    // Ensure hotel_name present
     if (!hotel || String(hotel).trim() === "") return { ok: false, message: "Hotel name is required." };
 
-    // At least one of the main amounts should be a valid number (or allow zero? Backend may accept 0)
-    // We'll consider empty strings as 0 — but ensure numeric conversion valid
     const h = toNumber(hebergement);
     const b = toNumber(bar);
     const c = toNumber(cuisine);
@@ -141,7 +132,6 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
       return { ok: false, message: "Montant fields must be numeric." };
     }
 
-    // Validate expenses entries: labels can be empty but if amount provided must be numeric; ignore empty rows
     for (let i = 0; i < expenses.length; i++) {
       const e = expenses[i];
       const hasLabel = e.label && String(e.label).trim() !== "";
@@ -149,7 +139,6 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
       if (hasAmount && !Number.isFinite(toNumber(e.amount))) {
         return { ok: false, message: `Expense amount must be numeric for row ${i + 1}.` };
       }
-      // If label present but no amount, allow (some workflows may allow). If backend requires both, we can enforce here.
     }
 
     return { ok: true };
@@ -164,9 +153,6 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
 
     const isoDate = date instanceof Date ? date.toISOString().slice(0, 10) : String(date);
 
-    // Build payload that covers both field-name conventions:
-    // - numeric montant_* fields
-    // - string hebergement/bar/cuisine fields matching example structure user provided
     const montant_hebergement = Number(toNumber(hebergement).toFixed(2));
     const montant_bar = Number(toNumber(bar).toFixed(2));
     const montant_cuisine = Number(toNumber(cuisine).toFixed(2));
@@ -175,7 +161,6 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
     const bar_str = formatNumberString(bar);
     const cuisine_str = formatNumberString(cuisine);
 
-    // Normalize expenses: include numeric amount and string amount for compatibility
     const normalizedExpenses = (expenses || [])
       .filter((e) => (e.label && String(e.label).trim() !== "") || (String(e.amount).trim() !== ""))
       .map((e) => {
@@ -184,25 +169,20 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
           label: e.label ?? "",
           amount: amountNum,
           amount_str: formatNumberString(e.amount),
-          id: e.id, // include id if exists for updates
+          id: e.id,
         };
       });
 
-    // Final payload includes both name patterns. Backend will pick expected fields.
     const payload = {
       hotel_name: hotel,
-      // numeric expected fields
       montant_hebergement,
       montant_bar,
       montant_cuisine,
-      // string-named fields (your example)
       hebergement: hebergement_str,
       bar: bar_str,
       cuisine: cuisine_str,
-      // expenses: include objects with amount numeric (and amount_str just in case)
       expenses: normalizedExpenses.map((e) => {
         const out = { label: e.label, amount: e.amount };
-        // some backends may expect string amounts; include if needed
         out.amount_str = e.amount_str;
         if (e.id) out.id = e.id;
         return out;
@@ -218,18 +198,23 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-      <ScrollView style={styles.formContainer} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.formContainer} contentContainerStyle={{ paddingBottom: 30 }}>
         <Text style={styles.formTitle}>{submitLabel} Report</Text>
 
-        <View style={[styles.input, { padding: 0 }]}>
-          <Picker selectedValue={hotel} onValueChange={(v) => setHotel(v)} style={{ color: "#001F60" }}>
+        <View style={[styles.input, { padding: 0, marginBottom: 12 }]}>
+          <Picker selectedValue={hotel} onValueChange={(v) => setHotel(v)} style={{ color: "#001F60", fontSize: 14 }}>
             <Picker.Item label="Mbolo Hotel" value="Mbolo Hotel" />
             <Picker.Item label="Hotel La Dibamba" value="Hotel La Dibamba" />
           </Picker>
         </View>
 
-        <TouchableOpacity style={[styles.input, { justifyContent: "center" }]} onPress={() => setShowPicker(true)}>
-          <Text>{`${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`}</Text>
+        <TouchableOpacity
+          style={[styles.input, { justifyContent: "center", marginBottom: 12 }]}
+          onPress={() => setShowPicker(true)}
+        >
+          <Text style={{ fontSize: 14, color: "#001F60" }}>
+            {`${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`}
+          </Text>
         </TouchableOpacity>
 
         {showPicker && (
@@ -248,68 +233,73 @@ function GenerateReportForm({ onClose, onSubmit, reportData, defaultHotel, selec
         <TextInputWithLabel label="Montant Bar" value={bar} onChangeText={setBar} keyboardType="numeric" />
         <TextInputWithLabel label="Montant Cuisine" value={cuisine} onChangeText={setCuisine} keyboardType="numeric" />
 
-        <Text style={[styles.subtitle, { marginTop: 6 }]}>Expenses</Text>
+        <Text style={[styles.subtitle, { marginTop: 16, marginBottom: 8, fontSize: 16 }]}>Expenses</Text>
 
         {expenses.map((exp, idx) => (
           <View key={idx} style={styles.expenseRowForm}>
             <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.expenseLabel}>Label</Text>
-              <View style={[styles.input, { marginBottom: 6 }]}>
+              <Text style={[styles.expenseLabel, { fontSize: 14 }]}>Label</Text>
+              <View style={[styles.input, { marginBottom: 4 }]}>
                 <TextInput
                   value={exp.label}
                   onChangeText={(v) => updateExpense(idx, "label", v)}
                   placeholder="e.g. Samson"
-                  style={{ padding: 10 }}
+                  style={{ padding: 8, fontSize: 14, color: "#001F60" }}
+                  placeholderTextColor="#666"
                 />
               </View>
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text style={styles.expenseLabel}>Amount</Text>
-              <View style={[styles.input, { marginBottom: 6 }]}>
+              <Text style={[styles.expenseLabel, { fontSize: 14 }]}>Amount</Text>
+              <View style={[styles.input, { marginBottom: 4 }]}>
                 <TextInput
                   value={exp.amount}
                   onChangeText={(v) => updateExpense(idx, "amount", v)}
                   placeholder="0.00"
                   keyboardType="numeric"
-                  style={{ padding: 10 }}
+                  style={{ padding: 8, fontSize: 14, color: "#001F60" }}
+                  placeholderTextColor="#666"
                 />
               </View>
             </View>
 
-            <TouchableOpacity style={styles.removeExpenseBtn} onPress={() => removeExpense(idx)} accessibilityLabel="Remove expense">
-              <Ionicons name="trash-outline" size={18} color="#FFF" />
+            <TouchableOpacity
+              style={styles.removeExpenseBtn}
+              onPress={() => removeExpense(idx)}
+              accessibilityLabel="Remove expense"
+            >
+              <Ionicons name="trash-outline" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
         ))}
 
         <TouchableOpacity style={styles.addBtnForm} onPress={addExpense}>
-          <Text style={styles.addBtnTextForm}>+ Add Expense</Text>
+          <Text style={[styles.addBtnTextForm, { fontSize: 14 }]}>+ Add Expense</Text>
         </TouchableOpacity>
 
-        <View style={{ marginTop: 6 }}>
-          <Text style={styles.summary}>Total Income: {totalIncome.toFixed(2)} FCFA</Text>
-          <Text style={styles.summary}>Total Expenses: {totalExpenses.toFixed(2)} FCFA</Text>
-          <Text style={styles.summary}>Reste en caisse: {reste.toFixed(2)} FCFA</Text>
+        <View style={{ marginTop: 10 }}>
+          <Text style={[styles.summary, { fontSize: 14 }]}>Total Income: {totalIncome.toFixed(2)} FCFA</Text>
+          <Text style={[styles.summary, { fontSize: 14 }]}>Total Expenses: {totalExpenses.toFixed(2)} FCFA</Text>
+          <Text style={[styles.summary, { fontSize: 14 }]}>Reste en caisse: {reste.toFixed(2)} FCFA</Text>
         </View>
 
         <TouchableOpacity style={styles.submitBtnForm} onPress={handleSubmit}>
-          <Text style={styles.submitText}>{submitLabel}</Text>
+          <Text style={[styles.submitText, { fontSize: 16 }]}>{submitLabel}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.closeBtnForm} onPress={onClose}>
-          <Text style={styles.closeText}>Cancel</Text>
+          <Text style={[styles.closeText, { fontSize: 14 }]}>Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-/* Main Home */
 const Home = () => {
   const navigation = useNavigation();
 
-  const [activeTab, setActiveTab] = useState("mbolo"); // "mbolo" or "dibamba"
+  const [activeTab, setActiveTab] = useState("mbolo");
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -335,7 +325,6 @@ const Home = () => {
 
   const getHotelNameForTab = (tab) => (tab === "mbolo" ? "Mbolo Hotel" : "Hotel La Dibamba");
 
-  /* Helper: find exact match in array by hotel_name + YYYY-MM-DD date */
   const findExactMatchInArray = (arr, hotelName, dateStr) => {
     if (!Array.isArray(arr)) return null;
     return arr.find((item) => {
@@ -348,7 +337,6 @@ const Home = () => {
     });
   };
 
-  /* Fetch report with defensive matching */
   const fetchReport = async ({ overrideDate = null, overrideHotel = null } = {}) => {
     setLoading(true);
     try {
@@ -357,11 +345,8 @@ const Home = () => {
       const hotelName = overrideHotel ?? getHotelNameForTab(activeTab);
 
       const url = `${API_URL}?date=${dateStr}&hotel_name=${encodeURIComponent(hotelName)}`;
-      console.log("Fetching report URL:", url);
-
       const res = await axios.get(url);
       const data = res.data;
-      console.log("fetchReport raw response:", data);
 
       let matchedReport = findExactMatchInArray(data, hotelName, dateStr);
       if (!matchedReport && Array.isArray(data) && data.length === 1) {
@@ -396,14 +381,12 @@ const Home = () => {
         setExpenses([Object.assign({}, EMPTY_EXPENSE)]);
       }
     } catch (err) {
-      console.log("fetchReport error:", err.response?.data ?? err.message ?? err);
       Alert.alert("Network", "Failed to fetch report. Check backend and network.");
     } finally {
       setLoading(false);
     }
   };
 
-  /* Create/Update with robust pre-check and correct payload mapping */
   const handleGenerateOrUpdate = async (payload) => {
     try {
       const isUpdate = updateMode && formReport && formReport.id;
@@ -412,12 +395,10 @@ const Home = () => {
       const payloadDate = payload.date || payload.created_at || formatDateToYYYYMMDD(date);
       const dateStr = typeof payloadDate === "string" ? payloadDate : formatDateToYYYYMMDD(new Date(payloadDate));
 
-      // Strict pre-check that finds exact match in response data
       if (!isUpdate) {
         try {
           const checkRes = await axios.get(`${API_URL}?date=${dateStr}&hotel_name=${encodeURIComponent(payload.hotel_name)}`);
           const checkData = checkRes.data;
-          console.log("pre-check raw response:", checkData);
           const exact = findExactMatchInArray(checkData, payload.hotel_name, dateStr);
           if (exact) {
             Alert.alert(
@@ -446,15 +427,12 @@ const Home = () => {
             );
             return;
           }
-        } catch (err) {
-          console.log("pre-check network error (non-blocking):", err.response?.data ?? err.message ?? err);
-        }
+        } catch {}
       }
 
       const url = isUpdate ? `${API_URL}${formReport.id}/` : API_URL;
       const method = isUpdate ? "put" : "post";
 
-      // Normalize incoming payload fields (client form already did most of this, but ensure here)
       const rawH = payload.montant_hebergement !== undefined ? payload.montant_hebergement : payload.hebergement !== undefined ? payload.hebergement : 0;
       const rawB = payload.montant_bar !== undefined ? payload.montant_bar : payload.bar !== undefined ? payload.bar : 0;
       const rawC = payload.montant_cuisine !== undefined ? payload.montant_cuisine : payload.cuisine !== undefined ? payload.cuisine : 0;
@@ -463,7 +441,6 @@ const Home = () => {
       const montant_bar = Number(toNumber(rawB).toFixed(2));
       const montant_cuisine = Number(toNumber(rawC).toFixed(2));
 
-      // Provide both sets of fields (numeric montant_* and string hebergement/bar/cuisine)
       const finalPayload = {
         hotel_name: payload.hotel_name,
         montant_hebergement,
@@ -473,7 +450,6 @@ const Home = () => {
         bar: formatNumberString(rawB),
         cuisine: formatNumberString(rawC),
         expenses: (payload.expenses || []).map((e) => {
-          // ensure numeric amount for backend
           const amountNum = Number(toNumber(e.amount).toFixed(2));
           const obj = { label: e.label ?? "", amount: amountNum };
           if (e.id) obj.id = e.id;
@@ -481,8 +457,6 @@ const Home = () => {
         }),
         created_at: payload.created_at || payload.date || dateStr,
       };
-
-      console.log("Saving report to:", url, "payload:", finalPayload);
 
       await axios({
         method,
@@ -495,11 +469,8 @@ const Home = () => {
       setShowAddModal(false);
       setUpdateMode(false);
 
-      // Re-fetch to set displayReport to the newly created/updated report
       await fetchReport({ overrideDate: dateStr, overrideHotel: finalPayload.hotel_name });
     } catch (err) {
-      console.log("save error:", err.response?.data ?? err.message ?? err);
-      // Provide more helpful error feedback if backend returns validation errors
       const serverMsg = err.response?.data ?? err.message ?? "Unknown error";
       Alert.alert("Error", `Failed to save report. Server response: ${JSON.stringify(serverMsg)}`);
     }
@@ -587,14 +558,12 @@ const Home = () => {
 
       await Print.printAsync({ html });
     } catch (err) {
-      console.log("print error:", err);
       Alert.alert("Error", "Failed to print report.");
     }
   };
 
   useEffect(() => {
     fetchReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, activeTab]);
 
   return (
@@ -612,7 +581,7 @@ const Home = () => {
                 navigation.navigate("Notifications");
               }}
             >
-              <Ionicons name="notifications-outline" size={24} color="#E6C367" />
+              <Ionicons name="notifications-outline" size={20} color="#E6C367" />
               {unreadCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
@@ -633,26 +602,28 @@ const Home = () => {
                 setShowAddModal(true);
               }}
             >
-              <Ionicons name="add" size={26} color="#001F60" />
+              <Ionicons name="add" size={22} color="#001F60" />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Net Amount Card */}
-        <View style={[styles.cardLarge, { padding: 20 }]}>
+        <View style={[styles.cardLarge, { padding: 16 }]}>
           <Text style={styles.cardLabel}>Net Amount</Text>
-          <Text style={[styles.cardValue, { fontSize: 22 }]}>{String(Number(displayReste).toFixed(2))} FCFA</Text>
-          <Text style={{ color: "#3A2E00", fontSize: 12, marginTop: 6 }}>{displayReport ? displayReport.hotel_name ?? getHotelNameForTab(activeTab) : getHotelNameForTab(activeTab)}</Text>
+          <Text style={[styles.cardValue, { fontSize: 20 }]}>{String(Number(displayReste).toFixed(2))} FCFA</Text>
+          <Text style={styles.cardSubLabel}>
+            {displayReport ? displayReport.hotel_name ?? getHotelNameForTab(activeTab) : getHotelNameForTab(activeTab)}
+          </Text>
         </View>
 
         <View style={styles.row}>
-          <View style={[styles.cardSmall, { padding: 14 }]}>
+          <View style={[styles.cardSmall, { paddingVertical: 12 }]}>
             <Text style={styles.cardLabel}>Total Amount</Text>
-            <Text style={styles.cardValue}>{String(Number(displayTotalAmount).toFixed(2))} FCFA</Text>
+            <Text style={[styles.cardValue, { fontSize: 16 }]}>{String(Number(displayTotalAmount).toFixed(2))} FCFA</Text>
           </View>
-          <View style={[styles.cardSmall, { padding: 14 }]}>
+          <View style={[styles.cardSmall, { paddingVertical: 12 }]}>
             <Text style={styles.cardLabel}>Total Expenses</Text>
-            <Text style={styles.cardValue}>{String(Number(displayTotalExpenses).toFixed(2))} FCFA</Text>
+            <Text style={[styles.cardValue, { fontSize: 16 }]}>{String(Number(displayTotalExpenses).toFixed(2))} FCFA</Text>
           </View>
         </View>
 
@@ -685,10 +656,13 @@ const Home = () => {
 
         {/* Date Picker */}
         <TouchableOpacity
-          style={[styles.input, { backgroundColor: "#142A75", marginTop: 10 }]}
+          style={[styles.input, { backgroundColor: "#142A75", marginTop: 8 }]}
           onPress={() => setShowDatePicker(true)}
+          activeOpacity={0.8}
         >
-          <Text style={{ color: "#E6C367" }}>{`${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`}</Text>
+          <Text style={{ color: "#E6C367", fontSize: 14 }}>
+            {`${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`}
+          </Text>
         </TouchableOpacity>
 
         {showDatePicker && (
@@ -704,25 +678,25 @@ const Home = () => {
         )}
 
         {/* Main content */}
-        <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-          <View style={[styles.dayCard, { padding: 20 }]}>
-            <Text style={styles.dateText}>{`Report for ${date.toDateString()} — ${getHotelNameForTab(activeTab)}`}</Text>
+        <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+          <View style={[styles.dayCard, { padding: 16 }]}>
+            <Text style={[styles.dateText, { fontSize: 16 }]}>{`Report for ${date.toDateString()} — ${getHotelNameForTab(activeTab)}`}</Text>
 
-            <Text style={styles.amountText}>Montant Hébergement: FCFA {String(Number(displayMontantH).toFixed(2))}</Text>
-            <Text style={styles.amountText}>Montant Bar: FCFA {String(Number(displayMontantB).toFixed(2))}</Text>
-            <Text style={styles.amountText}>Montant Cuisine: FCFA {String(Number(displayMontantC).toFixed(2))}</Text>
+            <Text style={[styles.amountText, { fontSize: 14 }]}>Montant Hébergement: FCFA {String(Number(displayMontantH).toFixed(2))}</Text>
+            <Text style={[styles.amountText, { fontSize: 14 }]}>Montant Bar: FCFA {String(Number(displayMontantB).toFixed(2))}</Text>
+            <Text style={[styles.amountText, { fontSize: 14 }]}>Montant Cuisine: FCFA {String(Number(displayMontantC).toFixed(2))}</Text>
 
-            <Text style={styles.subtitle}>Expenses</Text>
+            <Text style={[styles.subtitle, { fontSize: 16 }]}>Expenses</Text>
 
             {(displayExpensesList && displayExpensesList.length) ? (
               displayExpensesList.map((exp, i) => (
                 <View key={i} style={styles.expenseRow}>
-                  <Text style={{ color: "#FFF", flex: 1 }}>{exp.label || "—"}</Text>
-                  <Text style={{ color: "#FFF", flex: 1 }}>FCFA {String(Number(toNumber(exp.amount)).toFixed(2))}</Text>
+                  <Text style={{ color: "#FFF", flex: 1, fontSize: 14 }}>{exp.label || "—"}</Text>
+                  <Text style={{ color: "#FFF", flex: 1, fontSize: 14 }}>FCFA {String(Number(toNumber(exp.amount)).toFixed(2))}</Text>
                 </View>
               ))
             ) : (
-              <Text style={{ color: "#FFF" }}>No expenses</Text>
+              <Text style={{ color: "#FFF", fontSize: 14 }}>No expenses</Text>
             )}
 
             <View style={styles.buttonRow}>
@@ -740,38 +714,15 @@ const Home = () => {
                   setShowAddModal(true);
                 }}
               >
-                <Text style={styles.buttonText}>{displayReport && displayReport.id ? "Update" : "Create"}</Text>
+                <Text style={[styles.buttonText, { fontSize: 16 }]}>{displayReport && displayReport.id ? "Update" : "Create"}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.printButton} onPress={handlePrint}>
-                <Text style={styles.buttonText}>Print</Text>
+                <Text style={[styles.buttonText, { fontSize: 16 }]}>Print</Text>
               </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
-
-        {/* Bottom nav */}
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem}>
-            <Ionicons name="home-outline" size={22} color="#E6C367" />
-            <Text style={styles.navText}>Home</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("Analytics")}>
-            <Ionicons name="bar-chart-outline" size={22} color="#E6C367" />
-            <Text style={styles.navText}>Analytics</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("History")}>
-            <Ionicons name="time-outline" size={22} color="#E6C367" />
-            <Text style={styles.navText}>History</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate("Settings")}>
-            <Ionicons name="settings-outline" size={22} color="#E6C367" />
-            <Text style={styles.navText}>Settings</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Modal */}
         <Modal visible={showAddModal} animationType="slide">
@@ -791,88 +742,184 @@ const Home = () => {
   );
 };
 
-/* Styles */
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#001F60" },
-  container: { flex: 1, backgroundColor: "#001F60", paddingHorizontal: 20, paddingBottom: 90 },
+  container: {
+    flex: 1,
+    backgroundColor: "#001F60",
+    paddingHorizontal: 16,
+    paddingBottom: 0,
+    minHeight: SCREEN_HEIGHT,
+  },
 
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 5 },
-  headerText: { fontSize: 22, color: "#FFD700", fontWeight: "bold" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  headerText: { fontSize: 20, color: "#FFD700", fontWeight: "bold" },
 
   addButton: {
     backgroundColor: "#FFD700",
     borderRadius: 20,
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
 
   cardLarge: {
     backgroundColor: "#FFD700",
     borderRadius: 20,
-    marginTop: 10,
-    padding: 20,
+    marginTop: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 7,
   },
-  cardSmall: {
-    flex: 1,
-    backgroundColor: "#FFEA7F",
-    borderRadius: 16,
-    marginHorizontal: 6,
-    padding: 18,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
+  cardLabel: {
+    fontSize: 16,
+    color: "#3A2E00",
+    fontWeight: "600",
+    marginBottom: 4,
   },
-  cardLabel: { fontSize: 16, color: "#3A2E00", fontWeight: "600" },
   cardValue: {
-    fontSize: 22,
+    fontSize: 20,
     color: "#3A2E00",
     fontWeight: "bold",
     textShadowColor: "rgba(0,0,0,0.2)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
+  cardSubLabel: {
+    color: "#3A2E00",
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: "600",
+  },
 
-  row: { flexDirection: "row", marginTop: 12 },
+  row: { flexDirection: "row", marginTop: 14 },
 
-  tabContainer: { flexDirection: "row", justifyContent: "center", backgroundColor: "#142A75", borderRadius: 25, marginTop: 16 },
-  tabButton: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 25 },
-  activeTabButton: { backgroundColor: "#FFD700" },
-  tabText: { color: "#FFD700", fontWeight: "600" },
-  activeTabText: { color: "#001F60", fontWeight: "bold" },
+  cardSmall: {
+    flex: 1,
+    backgroundColor: "#FFEA7F",
+    borderRadius: 16,
+    marginHorizontal: 6,
+    paddingVertical: 12,
+    paddingLeft: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 5,
+    elevation: 6,
+  },
 
-  scrollArea: { flex: 1 },
+  tabContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    backgroundColor: "#142A75",
+    borderRadius: 25,
+    marginTop: 16,
+    marginBottom: 14,
+    overflow: "hidden",
+    alignSelf: "center",
+    width: "60%",
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  activeTabButton: {
+    backgroundColor: "#FFD700",
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  tabText: {
+    color: "#FFD700",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  activeTabText: {
+    color: "#001F60",
+    fontWeight: "bold",
+  },
+
+  input: {
+    borderWidth: 1,
+    borderColor: "#E6E6E6",
+    borderRadius: 10,
+    backgroundColor: "#FFF",
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "ios" ? 12 : 8,
+    fontSize: 14,
+  },
+
+  scrollArea: {
+    flex: 1,
+    marginBottom: 16,
+  },
+
   dayCard: {
     backgroundColor: "#142A75",
     borderRadius: 18,
-    marginBottom: 12,
-    padding: 22,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 7,
   },
-  dateText: { color: "#FFD700", fontWeight: "bold", marginBottom: 10, fontSize: 18 },
-  amountText: { color: "#FFFFFF", marginBottom: 6, fontSize: 16, fontWeight: "600" },
+  dateText: {
+    color: "#FFD700",
+    fontWeight: "700",
+    marginBottom: 12,
+    fontSize: 16,
+  },
+  amountText: {
+    color: "#FFFFFF",
+    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: "600",
+  },
 
-  subtitle: { fontSize: 18, fontWeight: "bold", color: "#FFD700", marginBottom: 10, marginTop: 14 },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFD700",
+    marginBottom: 8,
+    marginTop: 14,
+  },
 
-  buttonRow: { flexDirection: "row", justifyContent: "center", gap: 12, marginTop: 12 },
+  expenseRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.15)",
+    paddingBottom: 4,
+  },
+
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 20,
+    gap: 12,
+  },
 
   printButton: {
     flex: 1,
@@ -900,25 +947,44 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  buttonText: { color: "#001F60", fontWeight: "bold", fontSize: 16 },
+  buttonText: {
+    color: "#001F60",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
 
-  bottomNav: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", backgroundColor: "#142A75", paddingVertical: 12 },
-  navItem: { alignItems: "center" },
-  navText: { color: "#FFD700", fontSize: 12, marginTop: 4 },
+  formContainer: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    paddingHorizontal: 16,
+    paddingTop: 30,
+    paddingBottom: 30,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#001F60",
+    marginBottom: 20,
+    textAlign: "center",
+  },
 
-  formContainer: { flex: 1, backgroundColor: "#FFF", padding: 10 },
-  formTitle: { fontSize: 22, fontWeight: "bold", color: "#001F60", marginBottom: 16, marginTop: 40, textAlign: "center" },
-
-  input: { borderWidth: 1, borderColor: "#E6E6E6", borderRadius: 10, marginTop: 10, marginBottom: 10, backgroundColor: "#FFF" },
-  expenseRowForm: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  expenseLabel: { fontWeight: "600", marginBottom: 4, color: "#001F60" },
+  expenseRowForm: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  expenseLabel: {
+    fontWeight: "600",
+    marginBottom: 2,
+    color: "#001F60",
+  },
 
   removeExpenseBtn: {
     backgroundColor: "#E53935",
     padding: 10,
     borderRadius: 8,
     marginLeft: 6,
-    height: 44,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -927,22 +993,85 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
 
-  addBtnForm: { backgroundColor: "#001F60", paddingVertical: 10, borderRadius: 8, alignItems: "center", marginBottom: 18, marginTop: 6 },
-  addBtnTextForm: { color: "#FFD700", fontWeight: "700" },
+  addBtnForm: {
+    backgroundColor: "#001F60",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  addBtnTextForm: {
+    color: "#FFD700",
+    fontWeight: "700",
+    fontSize: 14,
+  },
 
-  submitBtnForm: { backgroundColor: "#001F60", padding: 16, borderRadius: 14, alignItems: "center", marginTop: 12 },
-  submitText: { color: "#FFD700", fontWeight: "bold", fontSize: 16 },
-  closeBtnForm: { marginTop: 12, alignItems: "center" },
-  closeText: { color: "#999" },
+  submitBtnForm: {
+    backgroundColor: "#001F60",
+    padding: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  submitText: {
+    color: "#FFD700",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  closeBtnForm: {
+    marginTop: 14,
+    alignItems: "center",
+  },
+  closeText: {
+    color: "#666",
+    fontSize: 14,
+  },
 
-  expenseRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
-  addBtn: { backgroundColor: "#FFD700", paddingVertical: 12, borderRadius: 10, alignItems: "center", marginBottom: 18 },
-  addBtnText: { color: "#001F60", fontWeight: "bold" },
-  summary: { fontSize: 16, color: "#131212ff", fontWeight: "700", marginBottom: 6, textAlign: "center" },
+  summary: {
+    fontSize: 14,
+    color: "#FFD700",
+    fontWeight: "600",
+    marginBottom: 4,
+  },
 
-  notificationButton: { position: "relative", width: 40, height: 40, marginRight: -4, marginTop: 5, alignItems: "center", justifyContent: "center" },
-  notificationBadge: { position: "absolute", top: 3, right: 3, backgroundColor: "red", borderRadius: 10, minWidth: 16, height: 16, justifyContent: "center", alignItems: "center", paddingHorizontal: 3 },
-  notificationBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  notificationButton: {
+    position: "relative",
+    width: 36,
+    height: 36,
+    marginRight: -6,
+    marginTop: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: "red",
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 3,
+    zIndex: 10,
+  },
+  notificationBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
 });
 
 export default Home;

@@ -1,3 +1,4 @@
+// App.js
 import React, { useEffect } from "react";
 import { Linking } from "react-native";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
