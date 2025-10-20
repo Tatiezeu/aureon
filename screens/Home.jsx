@@ -20,7 +20,7 @@ import { useNavigation } from "@react-navigation/native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import axios from "axios";
 
-const API_URL = "http://172.20.10.2:8000/api/reports/";
+const API_URL = "http://192.168.0.122:8000/api/reports/";
 
 const months = [
   "January","February","March","April","May","June","July","August","September","October","November","December",

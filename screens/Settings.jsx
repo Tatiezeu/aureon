@@ -48,7 +48,7 @@ export default function Settings({ navigation }) {
   const [switchMenuVisible, setSwitchMenuVisible] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
 
-  const BASE_URL = "http://172.20.10.2:8000";
+  const BASE_URL = "http://192.168.0.122:8000";
 
   const colors = useMemo(() => {
     return themeMode === "Dark"

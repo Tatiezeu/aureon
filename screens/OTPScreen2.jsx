@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import axios from "axios";
 
-const BASE_URL = "http://172.20.10.2:8000";
+const BASE_URL = "http://192.168.0.122:8000";
 
 const OTPScreen2 = () => {
   const navigation = useNavigation();

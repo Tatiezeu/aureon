@@ -18,7 +18,7 @@ import * as Print from "expo-print";
 
 export default function TransactionHistory() {
   // ---------- Configuration ----------
-  const API_BASE = "http://172.20.10.2:8000/api/reports";
+  const API_BASE = "http://192.168.0.122:8000/api/reports";
 
   const months = [
     "January",

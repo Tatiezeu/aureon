@@ -11,7 +11,7 @@ export default function ResetPassword() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = "http://172.20.10.2:8000";
+  const BACKEND_URL = "http://192.168.0.122:8000";
 
   const handleSubmit = async () => {
     if (!token) {
